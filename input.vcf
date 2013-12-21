@@ -1,0 +1,13 @@
+##fileformat=VCFv4.0
+## comment line
+#CHROM	   POS	ID	REF	ALT	QUAL	FILTER	INFO 
+1	1138913	.	.	.	.	.	.	data in col9	data in col10
+1	1139202	.	.	.	.	.	.	data in col9	data in col10
+1	1139498	.	.	.	.	.	.
+1	1138913	.	.	.	.	.	.
+1	1142150	.	.	.	.	.	.
+1	223316685	.	.	.	.	.	.	tri-allelic SNP
+7	98655221	.	.	.	.	.	.
+1	1365570	.	.	.	.	.	.	lincRNA
+1	1365925	.	.	.	.	.	.
+1	1366179	.	.	.	.	.	.
