@@ -1,0 +1,32 @@
+cd
+mkdir variantexplorer
+cd variantexplorer
+mkdir src
+cd src
+curl -O http://www.ensembl.org/cvsdownloads/ensembl-72.tar.gz
+curl -O http://www.ensembl.org/cvsdownloads/ensembl-compara-72.tar.gz
+curl -O http://www.ensembl.org/cvsdownloads/ensembl-variation-72.tar.gz 
+curl -O http://www.ensembl.org/cvsdownloads/ensembl-functgenomics-72.tar.gz 
+curl -O http://bioperl.org/DIST/old_releases/bioperl-1.2.3.tar.gz
+tar xzvf ensembl-72.tar.gz
+tar xzvf ensembl-compara-72.tar.gz
+tar xzvf ensembl-variation-72.tar.gz
+tar xzvf ensembl-functgenomics-72.tar.gz
+tar xzvf bioperl-1.2.3.tar.gz
+
+PERL5LIB=${PERL5LIB}:${HOME}/variantexplorer/src/bioperl-1.2.3 
+PERL5LIB=${PERL5LIB}:${HOME}/variantexplorer/src/ensembl/modules 
+PERL5LIB=${PERL5LIB}:${HOME}/variantexplorer/src/ensembl-compara/modules 
+PERL5LIB=${PERL5LIB}:${HOME}/variantexplorer/src/ensembl-variation/modules 
+PERL5LIB=${PERL5LIB}:${HOME}/variantexplorer/src/ensembl-functgenomics/modules 
+export PERL5LIB
+cd ..
+curl -O https://raw.github.com/rudi2013/variantexplorer/master/config.txt 
+curl -O https://raw.github.com/rudi2013/variantexplorer/master/input.vcf 
+curl -O https://raw.github.com/rudi2013/variantexplorer/master/manual.pdf 
+curl -O https://raw.github.com/rudi2013/variantexplorer/master/output.vcf 
+curl -O https://raw.github.com/rudi2013/variantexplorer/master/test.pl 
+curl -O https://raw.github.com/rudi2013/variantexplorer/master/test2.pl
+curl -O https://raw.github.com/rudi2013/variantexplorer/master/variantexplorer.pl 
+
+perl variantexplorer.pl input.vcf output2.vcf
