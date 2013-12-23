@@ -37,13 +37,23 @@ my $regfeat_adaptor = $reg->get_adaptor('Human', 'funcgen', 'regulatoryfeature')
 
 my @populations;
 
+my $addgeneinfo=0;
+my $addencodedata=0;
 # read config.txt
 open(CONFIGFILE,"config.txt") || die "Could not open configuration file config.txt";
 while(<CONFIGFILE>){ # loop through config file line by line 
     chomp;  # remove newline character from end of line
     my $stripped = $_; 
     $stripped =~ s/\s+//g; # remove spaces from line
-    if (length($stripped)>1 && ( substr($stripped,0,1) ne "#")) { push(@populations, $stripped); } # add line to populations array
+    if (length($stripped)>1 && ( substr($stripped,0,1) ne "#")) { 
+		if ($stripped eq "addgeneinfo") {
+			$addgeneinfo=1;
+		} elsif ($stripped eq "addencodedata") {
+			$addencodedata=1;
+		} else {
+			push(@populations, $stripped);  # add line to populations array
+		}
+	}
 }
 close(CONFIGFILE);
 
@@ -73,7 +83,12 @@ while(<FILE>){ # loop through each line in the input VCF file
 	if ( /^#/ ) {
 		if ($opt_t && /^#CHROM/ ) {
 			@val = split(/\t/,$_);
-			$val[7] .= "\tDNASE1\tHISTONE\tPOLYMERASE\tTFBS\tDNASE1_CELLTYPES\tHISTONE_CELLTYPES\tPOLYMERASE_CELLTYPES\tTFBS_CELLTYPES\tGENE_ID\tGENE_NAME\tBIOTYPE";
+			if ($addencodedata==1) {
+				$val[7] .= "\tDNASE1\tHISTONE\tPOLYMERASE\tTFBS\tDNASE1_CELLTYPES\tHISTONE_CELLTYPES\tPOLYMERASE_CELLTYPES\tTFBS_CELLTYPES";
+			}
+			if ($addgeneinfo==1) {
+				$val[7] .= "\tGENE_ID\tGENE_NAME\tBIOTYPE";
+			}
 			foreach my $pop (@populations) {  ## add all populations to column 7
 				$val[7] = $val[7]."\t${pop}_REF\t${pop}_REFFREQ\t${pop}_ALT\t${pop}_ALTFREQ";
 			}
@@ -107,12 +122,13 @@ while(<FILE>){ # loop through each line in the input VCF file
 
 	## loop through $genes and store each geneID, name and biotype
 	## in the corresponding array
-    while ( my $gene = shift @{$genes} ) {
-		push(@geneids, $gene->stable_id());
-		push(@geneextnames, $gene->external_name);
-		push(@genebiotype, $gene->biotype());
-    }	
-
+	if ($addgeneinfo==1) {
+		while ( my $gene = shift @{$genes} ) {
+			push(@geneids, $gene->stable_id());
+			push(@geneextnames, $gene->external_name);
+			push(@genebiotype, $gene->biotype());
+		}	
+	}
     ## create arrays to store ENCODE regulatory features:
 	## DHS peaks, histone peaks, polymerase peaks and TFBS peaks
     my @dhs;
@@ -128,62 +144,75 @@ while(<FILE>){ # loop through each line in the input VCF file
 
 	## get regulatory features in this slice
 	## loop through all features and store in corresponding array
-	my @reg_feats = @{$regfeat_adaptor->fetch_all_by_Slice($slice)};
-	foreach my $rf (@reg_feats){
-		# print "stable id: ". $rf->stable_id."\n";
-		my $rfs = $regfeat_adaptor->fetch_all_by_stable_ID($rf->stable_id);
-		foreach my $currentregfeat (@{$rfs}) {
+	if ($addencodedata==1) {
+		my @reg_feats = @{$regfeat_adaptor->fetch_all_by_Slice($slice)};
+		foreach my $rf (@reg_feats){
+			# print "stable id: ". $rf->stable_id."\n";
+			my $rfs = $regfeat_adaptor->fetch_all_by_stable_ID($rf->stable_id);
+			foreach my $currentregfeat (@{$rfs}) {
 
-			foreach my $att (@{$currentregfeat->regulatory_attributes()}){ #was rf
-				#print_feature($att);
-				my $overlap = 0;
-				$overlap = ($position>=$att->seq_region_start && $position<=$att->seq_region_end);
-				# print $att->display_label, "   snppos: ",$position, " start: ",$att->seq_region_start," end: ",$att->seq_region_end," overlapping with snp: ",$overlap;
-				# if ($overlap) {print "   yearh! \n\n"} else {print "\n\n"};
-				if ($overlap) {
-					my @val = split(/ - /,$att->display_label);
-					if    ($val[0] eq 'DNase1')   { push(@dhs,  $val[0])}
-					elsif ($val[0] eq 'H3K27ac')  { push(@hist, $val[0])}
-					elsif ($val[0] eq 'H3K27me3') { push(@hist, $val[0])}
-					elsif ($val[0] eq 'H3K36me3') { push(@hist, $val[0])}
-					elsif ($val[0] eq 'H4K91ac')  { push(@hist, $val[0])}
-					elsif (substr($val[0],0,3) eq 'H2A')  { push(@hist2, $att->display_label)}
-					elsif (substr($val[0],0,3) eq 'H2B')  { push(@hist2, $att->display_label)}
-					elsif (substr($val[0],0,3) eq 'H3K')  { push(@hist2, $att->display_label)}
-					elsif (substr($val[0],0,3) eq 'H4K')  { push(@hist2, $att->display_label)}
-					
-					elsif (substr($val[0],0,3) eq 'Pol')  { push(@pol, $val[0])}
-					else                          { push(@tfbs, $val[0])};
-					if    ($val[0] eq 'DNase1')   { push(@dhs2,  $att->display_label)}
-					elsif ($val[0] eq 'H3K27ac')  { push(@hist2, $att->display_label)}
-					elsif ($val[0] eq 'H3K27me3') { push(@hist2, $att->display_label)}
-					elsif ($val[0] eq 'H3K36me3') { push(@hist2, $att->display_label)}
-					elsif (substr($val[0],0,3) eq 'H2A')  { push(@hist2, $att->display_label)}
-					elsif (substr($val[0],0,3) eq 'H2B')  { push(@hist2, $att->display_label)}
-					elsif (substr($val[0],0,3) eq 'H3K')  { push(@hist2, $att->display_label)}
-					elsif (substr($val[0],0,3) eq 'H4K')  { push(@hist2, $att->display_label)}
-					
-					elsif ($val[0] eq 'H4K91ac')  { push(@hist2, $att->display_label)}
-					elsif (substr($val[0],0,3) eq 'Pol')  { push(@pol2, $att->display_label)}
-					else                          { push(@tfbs2, $att->display_label)};
+				foreach my $att (@{$currentregfeat->regulatory_attributes()}){ #was rf
+					#print_feature($att);
+					my $overlap = 0;
+					$overlap = ($position>=$att->seq_region_start && $position<=$att->seq_region_end);
+					# print $att->display_label, "   snppos: ",$position, " start: ",$att->seq_region_start," end: ",$att->seq_region_end," overlapping with snp: ",$overlap;
+					# if ($overlap) {print "   yearh! \n\n"} else {print "\n\n"};
+					if ($overlap) {
+						my @val = split(/ - /,$att->display_label);
+						if    ($val[0] eq 'DNase1')   { push(@dhs,  $val[0])}
+						elsif ($val[0] eq 'H3K27ac')  { push(@hist, $val[0])}
+						elsif ($val[0] eq 'H3K27me3') { push(@hist, $val[0])}
+						elsif ($val[0] eq 'H3K36me3') { push(@hist, $val[0])}
+						elsif ($val[0] eq 'H4K91ac')  { push(@hist, $val[0])}
+						elsif (substr($val[0],0,3) eq 'H2A')  { push(@hist2, $att->display_label)}
+						elsif (substr($val[0],0,3) eq 'H2B')  { push(@hist2, $att->display_label)}
+						elsif (substr($val[0],0,3) eq 'H3K')  { push(@hist2, $att->display_label)}
+						elsif (substr($val[0],0,3) eq 'H4K')  { push(@hist2, $att->display_label)}
+						
+						elsif (substr($val[0],0,3) eq 'Pol')  { push(@pol, $val[0])}
+						else                          { push(@tfbs, $val[0])};
+						if    ($val[0] eq 'DNase1')   { push(@dhs2,  $att->display_label)}
+						elsif ($val[0] eq 'H3K27ac')  { push(@hist2, $att->display_label)}
+						elsif ($val[0] eq 'H3K27me3') { push(@hist2, $att->display_label)}
+						elsif ($val[0] eq 'H3K36me3') { push(@hist2, $att->display_label)}
+						elsif (substr($val[0],0,3) eq 'H2A')  { push(@hist2, $att->display_label)}
+						elsif (substr($val[0],0,3) eq 'H2B')  { push(@hist2, $att->display_label)}
+						elsif (substr($val[0],0,3) eq 'H3K')  { push(@hist2, $att->display_label)}
+						elsif (substr($val[0],0,3) eq 'H4K')  { push(@hist2, $att->display_label)}
+						
+						elsif ($val[0] eq 'H4K91ac')  { push(@hist2, $att->display_label)}
+						elsif (substr($val[0],0,3) eq 'Pol')  { push(@pol2, $att->display_label)}
+						else                          { push(@tfbs2, $att->display_label)};
+					}
 				}
 			}
 		}
 	}
-
 	# results are stored in $result
 	# if the -t option is set, all results are added to $result separated by tabs
 	# if the -t option is not set, all resutls are added to $result separated by semi-colons
 	
 	# add ENCODE features to $result
 	my $result = "";
-	if ($opt_t) {
-    	$result = join("/",@dhs). "\t".join("/",@hist). "\t".join("/",@pol). "\t".join("/",@tfbs)."\t";
-    	$result .=   join("/",@dhs2)."\t".join("/",@hist2)."\t".join("/",@pol2)."\t".join("/",@tfbs2);
-	} else {
-    	$result = join("/",@dhs). ";".join("/",@hist). ";".join("/",@pol). ";".join("/",@tfbs).";";
-    	$result .=   join("/",@dhs2).";".join("/",@hist2).";".join("/",@pol2).";".join("/",@tfbs2);
+
+	if ($addencodedata==1) {
+		if ($opt_t) {
+			$result = join("/",@dhs). "\t".join("/",@hist). "\t".join("/",@pol). "\t".join("/",@tfbs)."\t";
+			$result .=   join("/",@dhs2)."\t".join("/",@hist2)."\t".join("/",@pol2)."\t".join("/",@tfbs2);
+		} else {
+			$result = join("/",@dhs). ";".join("/",@hist). ";".join("/",@pol). ";".join("/",@tfbs).";";
+			$result .=   join("/",@dhs2).";".join("/",@hist2).";".join("/",@pol2).";".join("/",@tfbs2);
+		}
 	}
+	# add gene annotation to result
+	if ($addgeneinfo==1) {
+		if ($opt_t) {
+			$result.="\t".join("/",@geneids)."\t".join("/",@geneextnames)."\t".join("/",@genebiotype);
+		} else {
+			$result.=";".join("/",@geneids).";".join("/",@geneextnames).";".join("/",@genebiotype);
+		}
+	}
+
 	
     my @vfs = @{$vfa->fetch_all_by_Slice($slice)};
     my $ref;
@@ -191,12 +220,6 @@ while(<FILE>){ # loop through each line in the input VCF file
     my $alt;
     my $altfreq;
 
-	# add gene annotation to result
-	if ($opt_t) {
-		$result.="\t".join("/",@geneids)."\t".join("/",@geneextnames)."\t".join("/",@genebiotype);
-	} else {
-		$result.=";".join("/",@geneids).";".join("/",@geneextnames).";".join("/",@genebiotype);
-	}
 
 	# amount of fields in input VCF file
     my $nrfields = @val;
